@@ -1,0 +1,35 @@
+# Build artifacts
+bin/
+obj/
+out/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.db-journal
+
+# Secrets
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+
+# Test results
+TestResults/
+coverage/
+
+# NuGet
+*.nupkg
+packages/
+
+# Misc
+.DS_Store
+Thumbs.db

@@ -1,0 +1,227 @@
+@page "/security-events"
+@using SecurityAuditDashboard.Core.Entities
+@using SecurityAuditDashboard.Core.Enums
+@using SecurityAuditDashboard.Core.Interfaces
+@inject ISecurityEventRepository EventRepository
+
+<PageTitle>Security Events</PageTitle>
+
+<div class="security-events">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <span class="bi bi-exclamation-triangle me-2"></span>
+            Security Events
+        </h1>
+        <div class="d-flex gap-2">
+            <select class="form-select" style="width: auto;" @bind="selectedSeverity">
+                <option value="">All Severities</option>
+                @foreach (var severity in Enum.GetValues<EventSeverity>())
+                {
+                    <option value="@severity">@severity</option>
+                }
+            </select>
+            <button class="btn btn-primary" @onclick="LoadEvents">
+                <span class="bi bi-arrow-clockwise me-1"></span>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (events?.Any() == true)
+    {
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Type</th>
+                            <th>Severity</th>
+                            <th>Description</th>
+                            <th>Source</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var evt in FilteredEvents)
+                        {
+                            <tr>
+                                <td>@evt.Timestamp.ToLocalTime().ToString("g")</td>
+                                <td>@evt.EventType</td>
+                                <td>
+                                    <span class="badge @GetSeverityBadgeClass(evt.Severity)">
+                                        @evt.Severity
+                                    </span>
+                                </td>
+                                <td>@TruncateText(evt.Description, 50)</td>
+                                <td>@(evt.Source ?? "N/A")</td>
+                                <td>
+                                    @if (evt.IsResolved)
+                                    {
+                                        <span class="badge bg-success">Resolved</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark">Open</span>
+                                    }
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewDetails(evt)">
+                                        <span class="bi bi-eye"></span>
+                                    </button>
+                                    @if (!evt.IsResolved)
+                                    {
+                                        <button class="btn btn-sm btn-outline-success ms-1" @onclick="() => ResolveEvent(evt)">
+                                            <span class="bi bi-check-lg"></span>
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="text-muted small mt-3">
+            Showing @FilteredEvents.Count() of @events.Count() events
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <span class="bi bi-shield-check fs-1 text-success d-block mb-3"></span>
+                <h5>No Security Events</h5>
+                <p class="text-muted">No security events have been recorded yet.</p>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Event Details Modal -->
+@if (selectedEvent != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <span class="bi bi-info-circle me-2"></span>
+                        Event Details
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row">
+                        <dt class="col-sm-3">Event ID</dt>
+                        <dd class="col-sm-9">@selectedEvent.Id</dd>
+
+                        <dt class="col-sm-3">Type</dt>
+                        <dd class="col-sm-9">@selectedEvent.EventType</dd>
+
+                        <dt class="col-sm-3">Severity</dt>
+                        <dd class="col-sm-9">
+                            <span class="badge @GetSeverityBadgeClass(selectedEvent.Severity)">
+                                @selectedEvent.Severity
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-3">Description</dt>
+                        <dd class="col-sm-9">@selectedEvent.Description</dd>
+
+                        <dt class="col-sm-3">Source</dt>
+                        <dd class="col-sm-9">@(selectedEvent.Source ?? "N/A")</dd>
+
+                        <dt class="col-sm-3">Timestamp</dt>
+                        <dd class="col-sm-9">@selectedEvent.Timestamp.ToLocalTime().ToString("F")</dd>
+
+                        <dt class="col-sm-3">Status</dt>
+                        <dd class="col-sm-9">
+                            @if (selectedEvent.IsResolved)
+                            {
+                                <span class="badge bg-success">Resolved by @selectedEvent.ResolvedBy</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark">Open</span>
+                            }
+                        </dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IEnumerable<SecurityEvent>? events;
+    private SecurityEvent? selectedEvent;
+    private string selectedSeverity = "";
+    private bool isLoading = true;
+
+    private IEnumerable<SecurityEvent> FilteredEvents =>
+        string.IsNullOrEmpty(selectedSeverity)
+            ? events ?? Enumerable.Empty<SecurityEvent>()
+            : events?.Where(e => e.Severity.ToString() == selectedSeverity) ?? Enumerable.Empty<SecurityEvent>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEvents();
+    }
+
+    private async Task LoadEvents()
+    {
+        isLoading = true;
+        try
+        {
+            events = await EventRepository.GetAllAsync();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ViewDetails(SecurityEvent evt)
+    {
+        selectedEvent = evt;
+    }
+
+    private async Task ResolveEvent(SecurityEvent evt)
+    {
+        evt.IsResolved = true;
+        evt.ResolvedAt = DateTime.UtcNow;
+        evt.ResolvedBy = "Admin"; // In real app, get from auth
+        await EventRepository.UpdateAsync(evt);
+        await LoadEvents();
+    }
+
+    private void CloseModal()
+    {
+        selectedEvent = null;
+    }
+
+    private string GetSeverityBadgeClass(EventSeverity severity) => severity switch
+    {
+        EventSeverity.Critical => "bg-danger",
+        EventSeverity.High => "bg-warning text-dark",
+        EventSeverity.Medium => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private string TruncateText(string text, int maxLength) =>
+        text.Length <= maxLength ? text : text[..maxLength] + "...";
+}

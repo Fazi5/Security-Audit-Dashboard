@@ -1,0 +1,150 @@
+@page "/users"
+@attribute [Authorize(Policy = "AdminOnly")]
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using SecurityAuditDashboard.Core.Entities
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+
+<PageTitle>User Management</PageTitle>
+
+<div class="row mb-4">
+    <div class="col">
+        <h1>User Management</h1>
+        <p class="text-muted">Manage system users and their roles.</p>
+    </div>
+</div>
+
+@if (users == null)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">System Users</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>Roles</th>
+                        <th>Status</th>
+                        <th>Last Login</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in users)
+                    {
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-initials bg-light rounded-circle text-primary me-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-weight: bold;">
+                                        @GetInitials(user)
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold">@user.FirstName @user.LastName</div>
+                                        <small class="text-muted">@user.UserName</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>@user.Email</td>
+                            <td>
+                                @if (userRoles.TryGetValue(user.Id, out var roles))
+                                {
+                                    @foreach (var role in roles)
+                                    {
+                                        <span class="badge bg-secondary me-1">@role</span>
+                                    }
+                                }
+                            </td>
+                            <td>
+                                @if (user.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">Inactive</span>
+                                }
+                                
+                                @if (user.LockoutEnd > DateTimeOffset.Now)
+                                {
+                                    <span class="badge bg-warning text-dark ms-1">Locked</span>
+                                }
+                            </td>
+                            <td>
+                                @if (user.LastLoginAt.HasValue)
+                                {
+                                    <span title="@user.LastLoginAt.Value.ToLocalTime()">
+                                        @user.LastLoginAt.Value.ToString("MMM dd, yyyy HH:mm")
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" title="Edit User">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                @if (user.IsActive)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger ms-1" title="Deactivate User">
+                                        <i class="bi bi-person-x"></i>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-outline-success ms-1" title="Activate User">
+                                        <i class="bi bi-person-check"></i>
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ApplicationUser>? users;
+    private Dictionary<string, IList<string>> userRoles = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load users
+        users = await UserManager.Users.ToListAsync();
+
+        // Load roles for each user
+        foreach (var user in users)
+        {
+            var roles = await UserManager.GetRolesAsync(user);
+            userRoles[user.Id] = roles;
+        }
+    }
+
+    private string GetInitials(ApplicationUser user)
+    {
+        var first = !string.IsNullOrEmpty(user.FirstName) ? user.FirstName[0].ToString() : "";
+        var last = !string.IsNullOrEmpty(user.LastName) ? user.LastName[0].ToString() : "";
+        
+        if (string.IsNullOrEmpty(first) && string.IsNullOrEmpty(last))
+        {
+            return user.UserName?[0].ToString().ToUpper() ?? "?";
+        }
+        
+        return (first + last).ToUpper();
+    }
+}

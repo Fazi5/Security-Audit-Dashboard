@@ -1,0 +1,14 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  SecurityAuditDashboard.Core -> C:\Users\faiza\OneDrive\Desktop\dotnet\SecurityAuditDashboard\src\SecurityAuditDashboard.Core\bin\Debug\net9.0\SecurityAuditDashboard.Core.dll
+  SecurityAuditDashboard.Shared -> C:\Users\faiza\OneDrive\Desktop\dotnet\SecurityAuditDashboard\src\SecurityAuditDashboard.Shared\bin\Debug\net9.0\SecurityAuditDashboard.Shared.dll
+  SecurityAuditDashboard.Infrastructure -> C:\Users\faiza\OneDrive\Desktop\dotnet\SecurityAuditDashboard\src\SecurityAuditDashboard.Infrastructure\bin\Debug\net9.0\SecurityAuditDashboard.Infrastructure.dll
+C:\Users\faiza\OneDrive\Desktop\dotnet\SecurityAuditDashboard\src\SecurityAuditDashboard.Web\Program.cs(21,13): error CS1061: 'LoggerEnrichmentConfiguration' does not contain a definition for 'WithMachineName' and no accessible extension method 'WithMachineName' accepting a first argument of type 'LoggerEnrichmentConfiguration' could be found (are you missing a using directive or an assembly reference?) [C:\Users\faiza\OneDrive\Desktop\dotnet\SecurityAuditDashboard\src\SecurityAuditDashboard.Web\SecurityAuditDashboard.Web.csproj]
+
+Build FAILED.
+
+C:\Users\faiza\OneDrive\Desktop\dotnet\SecurityAuditDashboard\src\SecurityAuditDashboard.Web\Program.cs(21,13): error CS1061: 'LoggerEnrichmentConfiguration' does not contain a definition for 'WithMachineName' and no accessible extension method 'WithMachineName' accepting a first argument of type 'LoggerEnrichmentConfiguration' could be found (are you missing a using directive or an assembly reference?) [C:\Users\faiza\OneDrive\Desktop\dotnet\SecurityAuditDashboard\src\SecurityAuditDashboard.Web\SecurityAuditDashboard.Web.csproj]
+    0 Warning(s)
+    1 Error(s)
+
+Time Elapsed 00:00:02.09

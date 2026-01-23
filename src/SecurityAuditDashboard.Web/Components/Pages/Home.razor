@@ -1,0 +1,223 @@
+﻿@page "/"
+@using SecurityAuditDashboard.Core.Interfaces
+@inject ISecurityReportService ReportService
+@inject IThreatDetectionService ThreatService
+@inject IAuditService AuditService
+
+<PageTitle>Security Dashboard</PageTitle>
+
+<div class="dashboard">
+    <h1 class="mb-4">
+        <span class="bi bi-shield-check me-2"></span>
+        Security Dashboard
+    </h1>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Stats Cards -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-subtitle mb-2 text-white-50">Total Events</h6>
+                                <h2 class="card-title mb-0">@stats?.TotalEvents</h2>
+                            </div>
+                            <span class="bi bi-activity fs-1 opacity-50"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card bg-danger text-white h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-subtitle mb-2 text-white-50">Critical Events</h6>
+                                <h2 class="card-title mb-0">@stats?.CriticalEvents</h2>
+                            </div>
+                            <span class="bi bi-exclamation-octagon fs-1 opacity-50"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card bg-warning text-dark h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-subtitle mb-2 text-muted">Failed Logins</h6>
+                                <h2 class="card-title mb-0">@stats?.FailedLogins</h2>
+                            </div>
+                            <span class="bi bi-person-x fs-1 opacity-50"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card bg-success text-white h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-subtitle mb-2 text-white-50">Active Threats</h6>
+                                <h2 class="card-title mb-0">@stats?.ActiveThreats</h2>
+                            </div>
+                            <span class="bi bi-shield-exclamation fs-1 opacity-50"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Row -->
+        <div class="row g-4">
+            <!-- Recent Activity -->
+            <div class="col-lg-8">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <span class="bi bi-clock-history me-2"></span>
+                            Recent Activity
+                        </h5>
+                        <a href="/audit-logs" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
+                    <div class="card-body">
+                        @if (recentLogs?.Any() == true)
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>User</th>
+                                            <th>Action</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var log in recentLogs.Take(5))
+                                        {
+                                            <tr>
+                                                <td>@log.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
+                                                <td>@log.UserName</td>
+                                                <td>@log.Action</td>
+                                                <td>
+                                                    @if (log.IsSuccessful)
+                                                    {
+                                                        <span class="badge bg-success">Success</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-danger">Failed</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-4">
+                                <span class="bi bi-inbox fs-1 d-block mb-2"></span>
+                                No recent activity
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Threats -->
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <span class="bi bi-shield-exclamation me-2 text-danger"></span>
+                            Active Threats
+                        </h5>
+                        <a href="/threat-alerts" class="btn btn-sm btn-outline-danger">View All</a>
+                    </div>
+                    <div class="card-body">
+                        @if (activeThreats?.Any() == true)
+                        {
+                            <div class="list-group list-group-flush">
+                                @foreach (var threat in activeThreats.Take(5))
+                                {
+                                    <div class="list-group-item d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6 class="mb-1">@threat.ThreatType</h6>
+                                            <small class="text-muted">@threat.Source</small>
+                                        </div>
+                                        <span class="badge @GetSeverityBadgeClass(threat.Severity)">
+                                            @threat.Severity
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-4">
+                                <span class="bi bi-shield-check fs-1 d-block mb-2 text-success"></span>
+                                No active threats
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Last Updated -->
+        <div class="text-muted small mt-4 text-end">
+            <span class="bi bi-clock me-1"></span>
+            Last updated: @stats?.LastScanTime.ToLocalTime().ToString("g")
+        </div>
+    }
+</div>
+
+@code {
+    private DashboardStats? stats;
+    private IEnumerable<SecurityAuditDashboard.Core.Entities.AuditLog>? recentLogs;
+    private IEnumerable<SecurityAuditDashboard.Core.Entities.ThreatAlert>? activeThreats;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            stats = await ReportService.GetDashboardStatsAsync();
+            recentLogs = await AuditService.GetRecentLogsAsync(5);
+            activeThreats = await ThreatService.GetActiveThreatsAsync();
+        }
+        catch (Exception ex)
+        {
+            // Log error - in production, use proper logging
+            Console.WriteLine($"Error loading dashboard: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetSeverityBadgeClass(SecurityAuditDashboard.Core.Enums.EventSeverity severity) => severity switch
+    {
+        SecurityAuditDashboard.Core.Enums.EventSeverity.Critical => "bg-danger",
+        SecurityAuditDashboard.Core.Enums.EventSeverity.High => "bg-warning text-dark",
+        SecurityAuditDashboard.Core.Enums.EventSeverity.Medium => "bg-info",
+        _ => "bg-secondary"
+    };
+}

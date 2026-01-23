@@ -1,0 +1,231 @@
+@page "/threat-alerts"
+@using SecurityAuditDashboard.Core.Entities
+@using SecurityAuditDashboard.Core.Enums
+@using SecurityAuditDashboard.Core.Interfaces
+@inject IThreatDetectionService ThreatService
+@inject IThreatAlertRepository ThreatRepository
+
+<PageTitle>Threat Alerts</PageTitle>
+
+<div class="threat-alerts">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <span class="bi bi-shield-exclamation me-2 text-danger"></span>
+            Threat Alerts
+        </h1>
+        <div class="d-flex gap-2">
+            <select class="form-select" style="width: auto;" @bind="showResolved">
+                <option value="false">Active Only</option>
+                <option value="true">Show All</option>
+            </select>
+            <button class="btn btn-primary" @onclick="LoadThreats">
+                <span class="bi bi-arrow-clockwise me-1"></span>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-danger" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (FilteredThreats.Any())
+    {
+        <div class="row g-4">
+            @foreach (var threat in FilteredThreats)
+            {
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 @GetCardBorderClass(threat.Severity)">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="badge @GetSeverityBadgeClass(threat.Severity)">
+                                @threat.Severity
+                            </span>
+                            <span class="badge @GetStatusBadgeClass(threat.Status)">
+                                @threat.Status
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <span class="bi bi-bug me-2"></span>
+                                @threat.ThreatType
+                            </h5>
+                            <p class="card-text text-muted small">@threat.Description</p>
+                            <div class="mb-2">
+                                <strong class="small">Source:</strong>
+                                <code class="small">@threat.Source</code>
+                            </div>
+                            <div class="mb-2">
+                                <strong class="small">Detected:</strong>
+                                <span class="small">@threat.DetectedAt.ToLocalTime().ToString("g")</span>
+                            </div>
+                            @if (threat.AssignedTo != null)
+                            {
+                                <div>
+                                    <strong class="small">Assigned:</strong>
+                                    <span class="small">@threat.AssignedTo</span>
+                                </div>
+                            }
+                        </div>
+                        @if (threat.Status != ThreatStatus.Resolved && threat.Status != ThreatStatus.FalsePositive)
+                        {
+                            <div class="card-footer bg-transparent">
+                                <div class="btn-group w-100">
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => InvestigateThreat(threat)">
+                                        <span class="bi bi-search me-1"></span>
+                                        Investigate
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success" @onclick="() => OpenResolveModal(threat)">
+                                        <span class="bi bi-check-lg me-1"></span>
+                                        Resolve
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => MarkFalsePositive(threat)">
+                                        <span class="bi bi-x me-1"></span>
+                                        False +
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <span class="bi bi-shield-check fs-1 text-success d-block mb-3"></span>
+                <h5>No Active Threats</h5>
+                <p class="text-muted">Your system is secure. No active threats detected.</p>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Resolve Modal -->
+@if (resolvingThreat != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Resolve Threat</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Resolution Notes</label>
+                        <textarea class="form-control" rows="3" @bind="resolutionNotes" 
+                                  placeholder="Describe how this threat was resolved..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-success" @onclick="ResolveThreat">
+                        <span class="bi bi-check-lg me-1"></span>
+                        Resolve
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IEnumerable<ThreatAlert>? threats;
+    private ThreatAlert? resolvingThreat;
+    private string resolutionNotes = "";
+    private string showResolved = "false";
+    private bool isLoading = true;
+
+    private IEnumerable<ThreatAlert> FilteredThreats =>
+        showResolved == "true"
+            ? threats ?? Enumerable.Empty<ThreatAlert>()
+            : threats?.Where(t => t.Status != ThreatStatus.Resolved && t.Status != ThreatStatus.FalsePositive) 
+              ?? Enumerable.Empty<ThreatAlert>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadThreats();
+    }
+
+    private async Task LoadThreats()
+    {
+        isLoading = true;
+        try
+        {
+            threats = await ThreatRepository.GetAllAsync();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task InvestigateThreat(ThreatAlert threat)
+    {
+        threat.Status = ThreatStatus.Investigating;
+        threat.AssignedTo = "Admin"; // In real app, get from auth
+        await ThreatRepository.UpdateAsync(threat);
+        await LoadThreats();
+    }
+
+    private void OpenResolveModal(ThreatAlert threat)
+    {
+        resolvingThreat = threat;
+        resolutionNotes = "";
+    }
+
+    private void CloseModal()
+    {
+        resolvingThreat = null;
+    }
+
+    private async Task ResolveThreat()
+    {
+        if (resolvingThreat != null)
+        {
+            await ThreatService.ResolveThreatAsync(resolvingThreat.Id, "Admin", resolutionNotes);
+            CloseModal();
+            await LoadThreats();
+        }
+    }
+
+    private async Task MarkFalsePositive(ThreatAlert threat)
+    {
+        threat.Status = ThreatStatus.FalsePositive;
+        threat.ResolvedAt = DateTime.UtcNow;
+        threat.ResolutionNotes = "Marked as false positive";
+        await ThreatRepository.UpdateAsync(threat);
+        await LoadThreats();
+    }
+
+    private string GetSeverityBadgeClass(EventSeverity severity) => severity switch
+    {
+        EventSeverity.Critical => "bg-danger",
+        EventSeverity.High => "bg-warning text-dark",
+        EventSeverity.Medium => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusBadgeClass(ThreatStatus status) => status switch
+    {
+        ThreatStatus.New => "bg-danger",
+        ThreatStatus.Investigating => "bg-primary",
+        ThreatStatus.Resolved => "bg-success",
+        ThreatStatus.FalsePositive => "bg-secondary",
+        ThreatStatus.Escalated => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    private string GetCardBorderClass(EventSeverity severity) => severity switch
+    {
+        EventSeverity.Critical => "border-danger",
+        EventSeverity.High => "border-warning",
+        _ => ""
+    };
+}

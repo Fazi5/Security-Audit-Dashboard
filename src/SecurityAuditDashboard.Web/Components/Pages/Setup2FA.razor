@@ -1,0 +1,227 @@
+@page "/account/setup-2fa"
+@using Microsoft.AspNetCore.Identity
+@using SecurityAuditDashboard.Core.Entities
+@using SecurityAuditDashboard.Web.Services
+@inject ITwoFactorService TwoFactorService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>Setup Two-Factor Authentication</PageTitle>
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <span class="bi bi-shield-lock me-2"></span>
+                        Two-Factor Authentication Setup
+                    </h4>
+                </div>
+                <div class="card-body">
+                    @if (isLoading)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    }
+                    else if (is2FAEnabled)
+                    {
+                        <div class="alert alert-success">
+                            <span class="bi bi-check-circle me-2"></span>
+                            Two-Factor Authentication is already enabled on your account.
+                        </div>
+                        <button class="btn btn-danger" @onclick="Disable2FA">
+                            <span class="bi bi-shield-x me-1"></span>
+                            Disable 2FA
+                        </button>
+                    }
+                    else if (setupComplete)
+                    {
+                        <div class="alert alert-success">
+                            <span class="bi bi-check-circle me-2"></span>
+                            Two-Factor Authentication has been successfully enabled!
+                        </div>
+                        <a href="/" class="btn btn-primary">Return to Dashboard</a>
+                    }
+                    else
+                    {
+                        <div class="mb-4">
+                            <h5>Step 1: Scan QR Code</h5>
+                            <p class="text-muted">
+                                Scan this QR code with your authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.)
+                            </p>
+                            
+                            @if (!string.IsNullOrEmpty(qrCodeBase64))
+                            {
+                                <div class="text-center mb-3">
+                                    <img src="@qrCodeBase64" alt="QR Code for 2FA" class="img-fluid" style="max-width: 200px;" />
+                                </div>
+                            }
+                            
+                            <div class="alert alert-info">
+                                <strong>Can't scan?</strong> Enter this code manually:
+                                <code class="d-block mt-2 p-2 bg-light text-dark">@secretKey</code>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h5>Step 2: Verify Code</h5>
+                            <p class="text-muted">
+                                Enter the 6-digit code from your authenticator app to complete setup.
+                            </p>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <span class="bi bi-key"></span>
+                                        </span>
+                                        <input type="text" 
+                                               class="form-control form-control-lg text-center" 
+                                               @bind="verificationCode" 
+                                               maxlength="6"
+                                               placeholder="000000"
+                                               style="letter-spacing: 0.5em; font-family: monospace;" />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            @if (!string.IsNullOrEmpty(errorMessage))
+                            {
+                                <div class="alert alert-danger mt-3">
+                                    <span class="bi bi-exclamation-triangle me-2"></span>
+                                    @errorMessage
+                                </div>
+                            }
+                        </div>
+
+                        <button class="btn btn-success btn-lg" @onclick="VerifyAndEnable" disabled="@isVerifying">
+                            @if (isVerifying)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            else
+                            {
+                                <span class="bi bi-check-lg me-1"></span>
+                            }
+                            Verify and Enable 2FA
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">About Two-Factor Authentication</h5>
+                </div>
+                <div class="card-body">
+                    <p>
+                        Two-factor authentication adds an extra layer of security to your account. 
+                        In addition to your password, you'll need to provide a time-based code from 
+                        your authenticator app when logging in.
+                    </p>
+                    <ul class="mb-0">
+                        <li>Codes refresh every 30 seconds</li>
+                        <li>Works offline - no SMS or internet required</li>
+                        <li>Compatible with any TOTP authenticator app</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string secretKey = "";
+    private string qrCodeBase64 = "";
+    private string verificationCode = "";
+    private string errorMessage = "";
+    private bool isLoading = true;
+    private bool isVerifying = false;
+    private bool is2FAEnabled = false;
+    private bool setupComplete = false;
+    private ApplicationUser? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                currentUser = await UserManager.FindByNameAsync(user.Identity.Name!);
+                if (currentUser != null)
+                {
+                    is2FAEnabled = await UserManager.GetTwoFactorEnabledAsync(currentUser);
+                    
+                    if (!is2FAEnabled)
+                    {
+                        // Generate new secret key for setup
+                        secretKey = TwoFactorService.GenerateSecretKey();
+                        qrCodeBase64 = TwoFactorService.GenerateQrCodeAsBase64(currentUser.Email!, secretKey);
+                    }
+                }
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task VerifyAndEnable()
+    {
+        if (currentUser == null) return;
+        
+        isVerifying = true;
+        errorMessage = "";
+
+        try
+        {
+            // Validate the code
+            if (!TwoFactorService.ValidateCode(secretKey, verificationCode))
+            {
+                errorMessage = "Invalid verification code. Please try again.";
+                return;
+            }
+
+            // Store the secret key (in production, use UserManager's token provider)
+            await UserManager.SetAuthenticationTokenAsync(
+                currentUser, 
+                "SecurityDashboard", 
+                "TotpSecret", 
+                secretKey);
+
+            // Enable 2FA
+            await UserManager.SetTwoFactorEnabledAsync(currentUser, true);
+
+            setupComplete = true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isVerifying = false;
+        }
+    }
+
+    private async Task Disable2FA()
+    {
+        if (currentUser == null) return;
+
+        await UserManager.SetTwoFactorEnabledAsync(currentUser, false);
+        await UserManager.RemoveAuthenticationTokenAsync(currentUser, "SecurityDashboard", "TotpSecret");
+        
+        is2FAEnabled = false;
+        secretKey = TwoFactorService.GenerateSecretKey();
+        qrCodeBase64 = TwoFactorService.GenerateQrCodeAsBase64(currentUser.Email!, secretKey);
+    }
+}

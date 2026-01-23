@@ -1,0 +1,86 @@
+@page "/reports"
+@attribute [Authorize(Policy = "ViewerAndAbove")]
+@using SecurityAuditDashboard.Core.Interfaces
+@inject ISecurityReportService ReportService
+
+<PageTitle>Security Reports</PageTitle>
+
+<div class="row mb-4">
+    <div class="col">
+        <h1>Security Reports</h1>
+        <p class="text-muted">Generate and view security audit reports.</p>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-primary" @onclick="GenerateReport">
+            <i class="bi bi-file-earmark-plus me-2"></i>Generate Report
+        </button>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center p-4">
+                <div class="display-4 text-primary mb-3">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                </div>
+                <h3>Incident Report</h3>
+                <p class="text-muted">Summary of all security incidents and threat alerts for the selected period.</p>
+                <button class="btn btn-outline-primary stretched-link">Download PDF</button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center p-4">
+                <div class="display-4 text-success mb-3">
+                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                </div>
+                <h3>Audit Log Export</h3>
+                <p class="text-muted">Full export of system audit logs in CSV format for external analysis.</p>
+                <button class="btn btn-outline-success stretched-link">Download CSV</button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center p-4">
+                <div class="display-4 text-warning mb-3">
+                    <i class="bi bi-file-earmark-ruled"></i>
+                </div>
+                <h3>Compliance Report</h3>
+                <p class="text-muted">Detailed report on system access, user activity, and policy compliance.</p>
+                <button class="btn btn-outline-warning text-dark stretched-link">View Report</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (showReportModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Generate Report</h5>
+                    <button type="button" class="btn-close" @onclick="() => showReportModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Report generation functionality coming soon...</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showReportModal = false">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool showReportModal = false;
+
+    private void GenerateReport()
+    {
+        showReportModal = true;
+    }
+}

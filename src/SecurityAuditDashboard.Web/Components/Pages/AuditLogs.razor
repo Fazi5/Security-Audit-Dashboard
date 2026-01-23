@@ -1,0 +1,147 @@
+@page "/audit-logs"
+@using SecurityAuditDashboard.Core.Entities
+@using SecurityAuditDashboard.Core.Interfaces
+@inject IAuditService AuditService
+
+<PageTitle>Audit Logs</PageTitle>
+
+<div class="audit-logs">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <span class="bi bi-journal-text me-2"></span>
+            Audit Logs
+        </h1>
+        <div class="d-flex gap-2">
+            <input type="text" class="form-control" placeholder="Search..." 
+                   @bind="searchTerm" @bind:event="oninput" style="width: 250px;" />
+            <button class="btn btn-primary" @onclick="LoadLogs">
+                <span class="bi bi-arrow-clockwise me-1"></span>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (logs?.Any() == true)
+    {
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>User</th>
+                            <th>Action</th>
+                            <th>IP Address</th>
+                            <th>Details</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in FilteredLogs.Take(100))
+                        {
+                            <tr>
+                                <td>@log.Timestamp.ToLocalTime().ToString("g")</td>
+                                <td>
+                                    <span class="bi bi-person me-1"></span>
+                                    @log.UserName
+                                </td>
+                                <td>@log.Action</td>
+                                <td>
+                                    <code>@log.IpAddress</code>
+                                </td>
+                                <td>@TruncateText(log.Details ?? "N/A", 40)</td>
+                                <td>
+                                    @if (log.IsSuccessful)
+                                    {
+                                        <span class="badge bg-success">
+                                            <span class="bi bi-check-circle me-1"></span>
+                                            Success
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">
+                                            <span class="bi bi-x-circle me-1"></span>
+                                            Failed
+                                        </span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <span class="text-muted small">
+                Showing @Math.Min(FilteredLogs.Count(), 100) of @logs.Count() logs
+            </span>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="ExportLogs">
+                <span class="bi bi-download me-1"></span>
+                Export CSV
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <span class="bi bi-journal fs-1 text-muted d-block mb-3"></span>
+                <h5>No Audit Logs</h5>
+                <p class="text-muted">No audit logs have been recorded yet.</p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private IEnumerable<AuditLog>? logs;
+    private string searchTerm = "";
+    private bool isLoading = true;
+
+    private IEnumerable<AuditLog> FilteredLogs =>
+        string.IsNullOrWhiteSpace(searchTerm)
+            ? logs ?? Enumerable.Empty<AuditLog>()
+            : logs?.Where(l =>
+                l.UserName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                l.Action.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                l.IpAddress.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                (l.Details?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)
+            ) ?? Enumerable.Empty<AuditLog>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLogs();
+    }
+
+    private async Task LoadLogs()
+    {
+        isLoading = true;
+        try
+        {
+            logs = await AuditService.GetAuditLogsAsync();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ExportLogs()
+    {
+        // In a real app, this would trigger a file download
+        // For now, just a placeholder
+    }
+
+    private string TruncateText(string text, int maxLength) =>
+        text.Length <= maxLength ? text : text[..maxLength] + "...";
+}
