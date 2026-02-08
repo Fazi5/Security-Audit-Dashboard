@@ -1,4 +1,4 @@
-﻿namespace SecurityAuditDashboard.Shared;
+namespace SecurityAuditDashboard.Shared;
 
 public class Class1
 {
