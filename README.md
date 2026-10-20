@@ -1,6 +1,6 @@
 # Security Audit Dashboard
 
-A comprehensive .NET 9 Blazor Server application for security monitoring, audit logging, and threat detection. This project demonstrates key .NET Core development concepts for interview preparation.
+A comprehensive .NET 9 Blazor Server application for security monitoring, audit logging, and threat detection. Built with a layered Clean Architecture (Core, Infrastructure, Web, Shared), real-time alerts over SignalR, and Docker deployment.
 
 ## 🚀 Features
 
